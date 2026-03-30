@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRYPTEX — OPERATION KEY EXCHANGE</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=VT323&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#020c12;
+  --cyan:#00d4ff; --cyan-glow:rgba(0,212,255,.5);
+  --amber:#ffb800; --amb-glow:rgba(255,184,0,.5);
+  --green:#00ff50; --grn-glow:rgba(0,255,80,.45);
+  --red:#ff3355;   --pink:#ff6acd;
+  --surf:rgba(0,212,255,.05); --surf2:rgba(0,212,255,.09);
+  --border:rgba(0,212,255,.2);
+  --mono:'Share Tech Mono',monospace;
+  --orb:'Orbitron',monospace;
+  --vt:'VT323',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);font-family:var(--mono);
+  color:rgba(0,212,255,.88);min-height:100vh;
+  overflow-x:hidden;font-size:15px;line-height:1.7;
+}
+
+/* ── SCANLINES ── */
+body::before{content:'';position:fixed;inset:0;z-index:9999;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.06) 2px,rgba(0,0,0,.06) 4px);}
+body::after{content:'';position:fixed;inset:0;z-index:9998;pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.55) 100%);}
+
+/* ── TOPBAR ── */
+.topbar{
+  position:fixed;top:0;left:0;right:0;z-index:500;height:46px;
+  display:flex;align-items:center;justify-content:space-between;padding:0 26px;
+  border-bottom:1px solid var(--border);
+  background:rgba(2,12,18,.95);backdrop-filter:blur(8px);
+}
+.tb-brand{font-family:var(--orb);font-size:14px;font-weight:900;letter-spacing:.25em;color:var(--cyan);text-shadow:0 0 16px var(--cyan-glow);}
+.tb-agent{font-family:var(--vt);font-size:20px;letter-spacing:.15em;color:rgba(0,212,255,.45);}
+.tb-right{display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.18em;color:var(--green);}
+.ldot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--grn-glow);animation:blink 1.3s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.15}}
+
+/* ── SCROLL WRAPPER ── */
+.scroll-wrap{max-width:780px;margin:0 auto;padding:80px 24px 120px;}
+
+/* ── REVEAL ON SCROLL ── */
+.reveal{opacity:0;transform:translateY(28px);transition:opacity .65s ease,transform .65s ease;}
+.reveal.visible{opacity:1;transform:none;}
+
+/* ── CHAPTER HEADER ── */
+.chapter{
+  text-align:center;padding:56px 0 36px;
+  border-bottom:1px solid rgba(0,212,255,.1);
+  margin-bottom:48px;
+}
+.chapter-eyebrow{font-size:11px;letter-spacing:.3em;color:rgba(0,212,255,.35);text-transform:uppercase;margin-bottom:10px;}
+.chapter-title{font-family:var(--orb);font-size:clamp(1.6rem,4vw,2.6rem);font-weight:900;letter-spacing:.1em;color:var(--cyan);text-shadow:0 0 28px var(--cyan-glow);line-height:1.15;}
+.chapter-sub{margin-top:10px;font-size:13px;color:rgba(0,212,255,.38);letter-spacing:.18em;text-transform:uppercase;}
+
+/* ── SCENE MARKER ── */
+.scene-marker{
+  display:flex;align-items:center;gap:14px;
+  margin:44px 0 28px;
+}
+.scene-line{flex:1;height:1px;background:var(--border);}
+.scene-label{font-family:var(--vt);font-size:18px;letter-spacing:.22em;color:rgba(0,212,255,.35);white-space:nowrap;}
+
+/* ── DIALOG BUBBLES ── */
+.dialog{display:flex;flex-direction:column;gap:18px;margin:0 0 32px;}
+
+.bubble-row{display:flex;gap:16px;align-items:flex-start;}
+.bubble-row.right{flex-direction:row-reverse;}
+
+.avatar{
+  width:128px;height:128px;border-radius:12px;flex-shrink:0;
+  border:2px solid;overflow:hidden;
+  position:relative;
+}
+.avatar img{
+  width:100%;height:100%;object-fit:cover;object-position:center top;
+  display:block;filter:grayscale(20%) contrast(1.05);
+  transition:filter .3s;
+}
+.avatar:hover img{filter:grayscale(0%) contrast(1.1);}
+.avatar.q{border-color:rgb(0, 255, 174);box-shadow:0 0 14px rgba(0, 255, 174, 0.28);}
+.avatar.player{border-color:var(--amber);box-shadow:0 0 14px rgba(255,184,0,.28);}
+.avatar.eve{border-color:var(--red);box-shadow:0 0 14px rgba(255,51,85,.28);}
+.avatar::after{
+  content:attr(data-name);
+  position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);
+  font-family:var(--mono);font-size:9px;letter-spacing:.12em;
+  white-space:nowrap;color:rgba(0,212,255,.35);font-weight:400;
+}
+
+.bubble{
+  max-width:80%;padding:14px 18px;
+  border-radius:4px;font-size:14px;line-height:1.8;
+  position:relative;
+}
+.bubble.from-q{
+  background:rgba(0, 255, 183, 0.07);
+  border:1px solid rgba(0, 255, 213, 0.22);
+  border-radius:4px 12px 12px 4px;
+  color:rgba(0, 255, 213, 0.9);
+}
+.bubble.from-q::before{
+  content:'';position:absolute;left:-7px;top:14px;
+  border:7px solid transparent;
+  border-right-color:rgba(0, 255, 213, 0.22);
+  border-left:none;
+}
+.bubble.from-player{
+  background:rgba(255,184,0,.07);
+  border:1px solid rgba(255,184,0,.22);
+  border-radius:12px 4px 4px 12px;
+  color:rgba(255,184,0,.9);
+  text-align:right;
+}
+.bubble.from-player::after{
+  content:'';position:absolute;right:-7px;top:14px;
+  border:7px solid transparent;
+  border-left-color:rgba(255,184,0,.22);
+  border-right:none;
+}
+.bubble b{color:#fff;font-weight:700;}
+.bubble .hl-cyan{color:var(--cyan);}
+.bubble .hl-amber{color:var(--amber);}
+.bubble .hl-green{color:var(--green);}
+.bubble .hl-red{color:var(--red);}
+
+/* ── TERMINAL BLOCK ── */
+.term{
+  border:1px solid var(--border);border-radius:6px;
+  background:rgba(0,0,0,.45);margin:20px 0;overflow:hidden;
+}
+.term-hdr{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 16px;border-bottom:1px solid var(--border);
+  background:rgba(0,212,255,.04);
+}
+.td{width:11px;height:11px;border-radius:50%;flex-shrink:0;}
+.td.r{background:#ff5f57} .td.y{background:#ffbd2e} .td.g{background:#28ca40}
+.term-title{font-size:12px;color:rgba(0,212,255,.5);letter-spacing:.1em;font-weight:bold;margin-left:4px;}
+.term-body{padding:20px 22px;}
+.tl{font-size:14px;line-height:2.1;color:rgba(0,212,255,.88);}
+.tl .p{color:var(--cyan);margin-right:8px;}
+.hi{color:var(--green);font-weight:bold;}
+.warn{color:var(--amber);}
+.danger{color:var(--red);}
+.info{color:var(--cyan);}
+
+/* ── CODE BLOCK ── */
+.code{
+  background:rgba(0,0,0,.5);border:1px solid var(--border);
+  border-radius:4px;padding:14px 18px;
+  font-size:13px;line-height:2.1;
+  overflow-x:auto;white-space:pre-wrap;word-break:break-all;
+}
+.cc{color:rgba(0,212,255,.35)} .cv{color:var(--amber)} .cr{color:var(--cyan)} .cok{color:#6affd4} .cbad{color:var(--red)}
+
+/* ── BUTTONS ── */
+.btn{
+  display:inline-flex;align-items:center;gap:8px;
+  background:transparent;border:1px solid var(--cyan);color:var(--cyan);
+  font-family:var(--mono);font-size:13px;letter-spacing:.1em;
+  padding:11px 22px;border-radius:3px;cursor:pointer;
+  text-transform:uppercase;
+  transition:background .15s,box-shadow .15s,transform .1s;
+  text-shadow:0 0 7px var(--cyan-glow);
+}
+.btn:hover{background:rgba(0,212,255,.1);box-shadow:0 0 18px var(--cyan-glow);}
+.btn:active{transform:scale(.97);}
+.btn:disabled{opacity:.3;cursor:default;pointer-events:none;}
+.btn.amber{border-color:var(--amber);color:var(--amber);text-shadow:0 0 7px var(--amb-glow);}
+.btn.amber:hover{background:rgba(255,184,0,.1);box-shadow:0 0 18px var(--amb-glow);}
+.btn.green{border-color:var(--green);color:var(--green);text-shadow:0 0 7px var(--grn-glow);}
+.btn.green:hover{background:rgba(0,255,80,.09);box-shadow:0 0 18px var(--grn-glow);}
+.btn.red{border-color:var(--red);color:var(--red);text-shadow:none;}
+.btn.red:hover{background:rgba(255,51,85,.1);}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;}
+
+/* ── ACTIVITY WRAPPER ── */
+.activity{
+  border:1px solid rgba(0,212,255,.28);border-radius:8px;
+  background:rgba(0,212,255,.02);
+  padding:28px 26px;margin:32px 0;
+  position:relative;
+}
+.activity::before{
+  content:attr(data-label);
+  position:absolute;top:-11px;left:20px;
+  font-family:var(--orb);font-size:10px;font-weight:700;letter-spacing:.2em;
+  color:var(--cyan);background:var(--bg);padding:0 10px;
+}
+
+/* ────────────────────────────────
+   ACTIVITY 1 — COLOUR ANALOGY
+──────────────────────────────── */
+.mix-flow{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin:14px 0;}
+.mix-arrow{font-size:22px;color:rgba(0,212,255,.4);flex-shrink:0;}
+.mix-label{font-size:10px;color:rgba(0,212,255,.45);text-transform:uppercase;letter-spacing:.1em;text-align:center;margin-top:7px;}
+.mix-step{text-align:center;opacity:0;transform:translateY(8px);transition:opacity .5s,transform .5s;}
+.mix-step.show{opacity:1;transform:none;}
+.cn{border-radius:50%;border:2px solid rgba(0,212,255,.3);transition:background-color .5s,box-shadow .5s;}
+.cn.glow{box-shadow:0 0 22px rgba(106,255,212,.6);}
+.sw-row{display:flex;gap:11px;flex-wrap:wrap;margin:12px 0;}
+.sw{width:50px;height:50px;border-radius:50%;cursor:pointer;border:2px solid transparent;
+  transition:transform .15s,border-color .15s,box-shadow .15s;position:relative;flex-shrink:0;}
+.sw:hover{transform:scale(1.15);}
+.sw.sel{border-color:#fff;box-shadow:0 0 14px rgba(255,255,255,.35);transform:scale(1.1);}
+.sw.sel::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;color:rgba(255,255,255,.9);}
+.act1-section-label{font-size:11px;color:rgba(0,212,255,.45);text-transform:uppercase;letter-spacing:.12em;margin:16px 0 10px;}
+.match-msg{display:none;text-align:center;margin-top:16px;font-family:var(--orb);font-size:13px;color:#6affd4;text-shadow:0 0 14px rgba(106,255,212,.55);letter-spacing:.1em;}
+
+/* ────────────────────────────────
+   ACTIVITY 2 — SLIDERS
+──────────────────────────────── */
+input[type=range]{-webkit-appearance:none;width:100%;height:4px;border-radius:2px;background:rgba(0,212,255,.18);outline:none;margin:8px 0;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--cyan);cursor:pointer;box-shadow:0 0 6px var(--cyan-glow);}
+select.nf{background:rgba(0,0,0,.35);border:1px solid var(--border);border-radius:4px;color:var(--cyan);font-family:var(--mono);font-size:14px;padding:6px 10px;cursor:pointer;}
+.sliders-grid{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-end;margin-bottom:18px;}
+.slider-group{display:flex;flex-direction:column;gap:4px;}
+.slider-label{font-size:10px;color:rgba(0,212,255,.45);text-transform:uppercase;letter-spacing:.12em;}
+.slider-val{font-family:var(--orb);font-size:1.15rem;margin-left:8px;}
+
+/* ────────────────────────────────
+   ACTIVITY 3 — EVE BRUTE FORCE
+──────────────────────────────── */
+.crack-cell{
+  padding:7px 10px;font-size:13px;border:1px solid var(--border);
+  border-radius:3px;text-align:center;cursor:pointer;min-width:52px;
+  transition:background .1s,border-color .15s;
+}
+.crack-cell:hover{border-color:var(--cyan);background:rgba(0,212,255,.08);}
+@keyframes scanPulse{0%,100%{background:rgba(255,184,0,.08)}50%{background:rgba(255,184,0,.18)}}
+.crack-cell.testing{background:rgba(255,184,0,.12);border-color:var(--amber);animation:scanPulse .4s ease infinite;}
+.crack-cell.miss{background:rgba(255,51,85,.08);border-color:rgba(255,51,85,.25);color:rgba(255,51,85,.5);cursor:default;}
+.crack-cell.hit{background:rgba(0,255,80,.14);border-color:var(--green);color:var(--green);box-shadow:0 0 8px var(--grn-glow);}
+#a3-cresult{display:none;margin-top:14px;}
+
+/* ────────────────────────────────
+   ACTIVITY 4 — FORWARD / REVERSE
+──────────────────────────────── */
+.time-result{display:none;margin-top:14px;}
+.time-result.show{display:block;animation:fadeSlide .3s ease;}
+@keyframes fadeSlide{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.bignum{font-size:12px;word-break:break-all;line-height:1.8;background:rgba(0,0,0,.35);border:1px solid var(--border);border-radius:4px;padding:10px 14px;color:var(--amber);max-height:80px;overflow-y:auto;}
+
+/* ── STATS GRID ── */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:11px;margin:14px 0;}
+.stat{background:var(--surf);border:1px solid var(--border);border-radius:6px;padding:13px;text-align:center;}
+.sv{font-family:var(--orb);font-size:1.4rem;display:block;margin-bottom:3px;}
+.sl{font-size:10px;color:rgba(0,212,255,.4);text-transform:uppercase;letter-spacing:.1em;}
+
+/* ── EVE AVATAR + BUBBLE ── */
+.avatar.eve{
+  border-color:var(--red);
+  box-shadow:0 0 14px rgba(255,51,85,.28);
+}
+.bubble.from-eve{
+  background:rgba(255,51,85,.06);
+  border:1px solid rgba(255,51,85,.22);
+  border-radius:4px 12px 12px 4px;
+  color:rgba(255,120,140,.9);
+}
+.bubble.from-eve::before{
+  content:'';position:absolute;left:-7px;top:14px;
+  border:7px solid transparent;
+  border-right-color:rgba(255,51,85,.22);
+  border-left:none;
+}
+
+/* ── TIME JUMP CINEMATIC ── */
+.time-jump{
+  display:flex;align-items:center;gap:0;
+  margin:72px 0 60px;
+  flex-direction:column;
+  text-align:center;
+  position:relative;
+}
+.tj-line{
+  width:1px;height:60px;
+  background:rgba(0,212,255,.15);
+  margin:0 auto;
+}
+.tj-content{
+  padding:28px 40px;
+  border:1px solid rgba(0,212,255,.14);
+  background:rgba(0,212,255,.03);
+  position:relative;
+}
+.tj-content::before,.tj-content::after{
+  content:'';position:absolute;
+  width:10px;height:10px;
+  border-color:var(--cyan);border-style:solid;
+  opacity:.35;
+}
+.tj-content::before{top:-1px;left:-1px;border-width:1px 0 0 1px;}
+.tj-content::after{bottom:-1px;right:-1px;border-width:0 1px 1px 0;}
+.tj-title{
+  font-family:'Georgia',serif;
+  font-size:clamp(1.8rem,4vw,2.8rem);
+  font-style:italic;
+  color:var(--cyan);
+  text-shadow:0 0 30px var(--cyan-glow);
+  letter-spacing:.04em;
+  margin-bottom:10px;
+}
+.tj-sub{
+  font-family:var(--mono);font-size:12px;
+  color:rgba(0,212,255,.38);
+  letter-spacing:.2em;text-transform:uppercase;
+}
+
+/* ── THE END ── */
+.the-end{
+  margin:80px 0 40px;
+  text-align:center;
+}
+.the-end-inner{
+  display:inline-flex;flex-direction:column;
+  align-items:center;gap:18px;
+  padding:48px 60px;
+}
+.the-end-rule{
+  width:120px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(0,212,255,.35),transparent);
+}
+.the-end-text{
+  font-family:'Georgia',serif;
+  font-size:clamp(2.4rem,6vw,4rem);
+  font-style:italic;
+  color:var(--cyan);
+  text-shadow:0 0 40px var(--cyan-glow), 0 0 80px rgba(0,212,255,.15);
+  letter-spacing:.06em;
+}
+.the-end-sub{
+  font-family:var(--mono);font-size:11px;
+  color:rgba(0,212,255,.3);
+  letter-spacing:.22em;text-transform:uppercase;
+}
+
+/* ── DIVIDER ── */
+hr.story{border:none;border-top:1px solid rgba(0,212,255,.1);margin:48px 0;}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:rgba(0,212,255,.25);border-radius:2px;}
+
+/* responsive */
+@media(max-width:560px){.mix-flow{gap:7px;}.sliders-grid{flex-direction:column;}}
+</style>
+</head>
+<body>
+
+<!-- ── TOP BAR ── -->
+<header class="topbar">
+  <div class="tb-brand">CRYPTEX</div>
+  <div class="tb-agent" id="tb-agent">OPERATIVE: —</div>
+  <div class="tb-right"><div class="ldot"></div>FIELD ACTIVE</div>
+</header>
+
+<div class="scroll-wrap">
+
+  <!-- ══════════════════════════════════════
+       CHAPTER HEADER
+  ══════════════════════════════════════ -->
+  <div class="chapter reveal">
+    <div class="chapter-eyebrow">⟨ OPERATION: KEY EXCHANGE // CLASSIFIED ⟩</div>
+    <div class="chapter-title">THE DIFFIE-HELLMAN<br>PROTOCOL</div>
+    <div class="chapter-sub">// a spy story about shared secrets</div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════
+       SCENE 1 — DIALOG WITH Q
+  ══════════════════════════════════════ -->
+  <div class="scene-marker reveal">
+    <div class="scene-line"></div>
+    <div class="scene-label">⟨ SCENE 01 — THE BRIEFING ⟩</div>
+    <div class="scene-line"></div>
+  </div>
+
+  <div class="dialog reveal">
+    <!-- Q speaks first -->
+    <div class="bubble-row">
+      <div class="avatar q" data-name="Q"><img src="images/Q.jpg" alt="Q"></div>
+      <div class="bubble from-q">
+        Hi agent <span class="player-name-text">AGENT</span>. Your mission, if you accept it, 
+        is to <span class="hl-red">infiltrate the enemy territory</span> and 
+        communicate the location and time of their next attack. I am giving you a 
+        special <span class="hl-green">transmitter</span> that ensures our 
+        communication stays secret. 
+        You must agree on a <span class="hl-green">shared encryption key</span> 
+        with your contact, but <b>without</b> communicating it on the public channel, 
+        otherwise the enemy might catch it. You are to proceed with the protocol Diffie-Hellman.
+      </div>
+    </div>
+
+    <div class="bubble-row right">
+      <div class="avatar player" id="player-avatar" data-name="AGENT"><img class="player-img" src="" alt="AGENT"></div>
+      <div class="bubble from-player">
+        Diffie-Hellman ? I have no clue of what you're talking about. And how exactly are we supposed to share something without communication ?<br><br> With telepathy ? 
+      </div>
+    </div>
+
+    <div class="bubble-row">
+      <div class="avatar q" data-name="Q"><img src="images/Q.jpg" alt="Q"></div>
+      <div class="bubble from-q">
+        I like your sarcasm, but if telepathy existed my degree in Computer Science would have no meaning.
+      </div>
+    </div>
+
+    <!-- <div class="bubble-row right">
+      <div class="avatar player" id="player-avatar2" data-name="AGENT"><img class="player-img" src="" alt="AGENT"></div>
+      <div class="bubble from-player">
+        ...
+      </div>
+    </div> -->
+
+    <div class="bubble-row">
+      <div class="avatar q" data-name="Q"><img src="images/Q.jpg" alt="Q"></div>
+      <div class="bubble from-q">
+        Let's start first with a very simple example. Imagine that you want to <span class="hl-green">share a secret color</span> with your contact, <b>Diffie-Hellman</b> allows it with the following process : 
+        You both agree on a <span class="hl-amber">public color</span>, it is okay if the enemy can see it. Then, each of you choose a <span class="hl-cyan">secret color</span> they will never reveal. You then mix your secret color with the public one and it will give you your <span class="hl-amber">public mix</span>.
+        Finally you exchange your public mixes and secretly mix it with your secret color. Magically you will end up with the <b>same exact color</b> ! A shared secret.
+        I prepared you a small program to visualize better the process, let's look at the screen.
+      </div>
+    </div>
+
+
+  </div>
+
+
+  <!-- ══════════════════════════════════════
+       ACTIVITY 1 — COLOUR ANALOGY
+  ══════════════════════════════════════ -->
+  <div class="activity reveal" data-label="ACTIVITY 01 — THE COLOUR ANALOGY">
+
+    <div class="term" style="border-color:rgba(255,184,0,.28);">
+      <div class="term-hdr"><div class="td r"></div><div class="td y"></div><div class="td g"></div><span class="term-title">PICK YOUR SECRET COLOUR</span></div>
+      <div class="term-body">
+        <div class="tl"><span class="p">></span> Choose a secret colour — this is your <span class="warn">private value</span>, never transmitted directly.</div>
+        <div class="sw-row" id="a1-swatches">
+          <div class="sw sel" data-c="220,50,70"  style="background:rgb(220,50,70)"></div>
+          <div class="sw"     data-c="50,90,220"  style="background:rgb(50,90,220)"></div>
+          <div class="sw"     data-c="50,180,80"  style="background:rgb(50,180,80)"></div>
+          <div class="sw"     data-c="180,50,200" style="background:rgb(180,50,200)"></div>
+          <div class="sw"     data-c="230,110,20" style="background:rgb(230,110,20)"></div>
+          <div class="sw"     data-c="20,180,200" style="background:rgb(20,180,200)"></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn amber" onclick="a1Start()">▶ START KEY EXCHANGE ANIMATION</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Animation box -->
+    <div id="a1-animbox" style="display:none;">
+      <div class="term" style="border-color:rgba(0,212,255,.25);">
+        <div class="term-hdr"><div class="td r"></div><div class="td y"></div><div class="td g"></div><span class="term-title">SHARED SECRET FORMATION</span></div>
+        <div class="term-body">
+
+          <div class="act1-section-label">① Public base — known to everyone</div>
+          <div class="mix-flow">
+            <div class="mix-step" id="s1base">
+              <div class="cn" style="width:58px;height:58px;background:rgb(255,215,60);box-shadow:0 0 14px rgba(255,215,60,.38)"></div>
+              <div class="mix-label">PUBLIC BASE</div>
+            </div>
+          </div>
+
+          <div class="act1-section-label" style="color:rgba(255,184,0,.7)">② You: mix your secret + base → send the mixture</div>
+          <div class="mix-flow">
+            <div class="mix-step" id="s1aSec"><div class="cn" id="s1aSecC" style="width:52px;height:52px"></div><div class="mix-label">YOUR SECRET</div></div>
+            <div class="mix-arrow mix-step" id="s1ar1">+</div>
+            <div class="mix-step" id="s1aPub0"><div class="cn" style="width:52px;height:52px;background:rgb(255,215,60)"></div><div class="mix-label">PUBLIC BASE</div></div>
+            <div class="mix-arrow mix-step" id="s1ar2">=</div>
+            <div class="mix-step" id="s1aMix"><div class="cn" id="s1aMixC" style="width:62px;height:62px;border-width:3px"></div><div class="mix-label">YOUR PUBLIC MIX</div></div>
+          </div>
+
+          <div class="act1-section-label" style="color:rgba(0,212,255,.7)">③ Your contact: same process with their secret</div>
+          <div class="mix-flow">
+            <div class="mix-step" id="s1bSec"><div class="cn" id="s1bSecC" style="width:52px;height:52px"></div><div class="mix-label">CONTACT SECRET</div></div>
+            <div class="mix-arrow mix-step" id="s1br1">+</div>
+            <div class="mix-step" id="s1bPub0"><div class="cn" style="width:52px;height:52px;background:rgb(255,215,60)"></div><div class="mix-label">PUBLIC BASE</div></div>
+            <div class="mix-arrow mix-step" id="s1br2">=</div>
+            <div class="mix-step" id="s1bMix"><div class="cn" id="s1bMixC" style="width:62px;height:62px;border-width:3px"></div><div class="mix-label">CONTACT PUBLIC MIX</div></div>
+          </div>
+
+          <div class="act1-section-label" style="color:rgba(106,255,212,.75)">④ Each adds their own secret to the other's mix → same shared secret</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:6px;">
+            <div>
+              <div style="font-size:10px;color:rgba(255,184,0,.55);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;">You compute:</div>
+              <div class="mix-flow" style="justify-content:flex-start;gap:8px;">
+                <div class="mix-step" id="s1fbm"><div class="cn" id="s1fbmC" style="width:44px;height:44px"></div><div class="mix-label">CONTACT MIX</div></div>
+                <div class="mix-arrow mix-step" id="s1fa1">+</div>
+                <div class="mix-step" id="s1fasec"><div class="cn" id="s1fasecC" style="width:44px;height:44px"></div><div class="mix-label">YOUR SECRET</div></div>
+                <div class="mix-arrow mix-step" id="s1fa2">=</div>
+                <div class="mix-step" id="s1fash"><div class="cn" id="s1fashC" style="width:56px;height:56px;border-width:3px"></div><div class="mix-label">SHARED KEY</div></div>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:rgba(0,212,255,.55);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;">Contact computes:</div>
+              <div class="mix-flow" style="justify-content:flex-start;gap:8px;">
+                <div class="mix-step" id="s1fam"><div class="cn" id="s1famC" style="width:44px;height:44px"></div><div class="mix-label">YOUR MIX</div></div>
+                <div class="mix-arrow mix-step" id="s1fb1">+</div>
+                <div class="mix-step" id="s1fbsec"><div class="cn" id="s1fbsecC" style="width:44px;height:44px"></div><div class="mix-label">CONTACT SECRET</div></div>
+                <div class="mix-arrow mix-step" id="s1fb2">=</div>
+                <div class="mix-step" id="s1fbsh"><div class="cn" id="s1fbshC" style="width:56px;height:56px;border-width:3px"></div><div class="mix-label">SHARED KEY</div></div>
+              </div>
+            </div>
+          </div>
+          <div id="a1-matchmsg" class="match-msg">✓ BOTH ARRIVE AT THE EXACT SAME SHARED SECRET</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /activity 1 -->
+
+  <hr class="story">
+
+  <!-- ══════════════════════════════════════
+       SCENE 2 — DIALOG + INTRO TO MATH
+  ══════════════════════════════════════ -->
+  <div class="scene-marker reveal">
+    <div class="scene-line"></div>
+    <div class="scene-label">⟨ SCENE 02 — THE MATHEMATICS ⟩</div>
+    <div class="scene-line"></div>
+  </div>
+
+  <div class="dialog reveal">
+    <div class="bubble-row">
+      <div class="avatar q" data-name="Q"><img src="images/Q.jpg" alt="Q"></div>
+      <div class="bubble from-q">
+        Good. You've got the intuition. Now the real thing.<br><br>
+        In practice we don't use paint. We use <span class="hl-cyan">modular exponentiation</span> — raising a number to a power and taking the remainder after dividing by a large prime number <span class="hl-amber">p</span>.<br><br>
+        The operation is: <b>g^x mod p</b>.<br>
+        <span class="hl-green">Computing this is fast.</span> Running it in reverse — finding <span class="hl-amber">x</span> when you only know the result — is called the <b>Discrete Logarithm Problem</b>, and for large primes it is <span class="hl-red">computationally impossible</span>.
+      </div>
+    </div>
+
+    <div class="bubble-row right">
+      <div class="avatar player" data-name="AGENT"><img class="player-img" src="" alt="AGENT"></div>
+      <div class="bubble from-player">
+        So <b>g</b> and <b>p</b> are public — anyone can know them. But the exponent <b>x</b> stays secret, and the result I send is useless without knowing <b>x</b>?
+      </div>
+    </div>
+
+    <div class="bubble-row">
+      <div class="avatar q" data-name="Q"><img src="images/Q.jpg" alt="Q"></div>
+      <div class="bubble from-q">
+        Precisely. The protocol works like this:<br><br>
+        You pick a secret <span class="hl-amber">a</span>. Your contact picks a secret <span class="hl-cyan">b</span>. You exchange <b>g^a mod p</b> and <b>g^b mod p</b> publicly. Then each of you raises the other's value to your own secret exponent. The maths guarantees you land on the <span class="hl-green">same number K</span> — your shared key. The enemy, watching every exchange, cannot compute K without solving the discrete log.
+      </div>
+    </div>
+
+    <div class="bubble-row right">
+      <div class="avatar player" data-name="AGENT"><img class="player-img" src="" alt="AGENT"></div>
+      <div class="bubble from-player">
+        It is still abstract for me. Q, I am sure you prepared something for me.
+      </div>
+    </div>
+
+    <div class="bubble-row">
+      <div class="avatar q" data-name="Q"><img src="images/Q.jpg" alt="Q"></div>
+      <div class="bubble from-q">
+        <span class="hl-cyan"><i>*chuckles*</i></span> <br>
+        You begin to know me agent <span class="player-name-text">AGENT</span> ! Indeed, I prepared you a playground. Adjust <b>g</b>, <b>p</b>, and the two secret exponents. Watch Alice's, Bob's, and Eve's perspectives update in real time. Note how both sides always converge on the same K.
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       ACTIVITY 2 — SLIDERS PLAYGROUND
+  ══════════════════════════════════════ -->
+  <div class="activity reveal" data-label="ACTIVITY 02 — DH PARAMETER PLAYGROUND">
+
+    <!-- Parameters -->
+    <div class="term" style="border-color:rgba(0,212,255,.28);">
+      <div class="term-hdr"><div class="td r"></div><div class="td y"></div><div class="td g"></div><span class="term-title">PARAMETERS — ADJUST AND OBSERVE</span></div>
+      <div class="term-body">
+        <div class="sliders-grid">
+          <div class="slider-group">
+            <div class="slider-label">g (base)</div>
+            <div style="display:flex;align-items:center;">
+              <input type="range" id="a2g" min="2" max="9" value="5" oninput="a2update()" style="width:110px">
+              <span class="slider-val" id="a2gv" style="color:var(--cyan)">5</span>
+            </div>
+          </div>
+          <div class="slider-group">
+            <div class="slider-label">p (prime)</div>
+            <select class="nf" id="a2p" onchange="a2update()">
+              <option value="7">7</option><option value="11">11</option>
+              <option value="13">13</option><option value="17">17</option>
+              <option value="19">19</option><option value="23" selected>23</option>
+              <option value="29">29</option><option value="31">31</option>
+            </select>
+          </div>
+          <div class="slider-group">
+            <div class="slider-label" style="color:rgba(255,184,0,.7)">Alice secret a</div>
+            <div style="display:flex;align-items:center;">
+              <input type="range" id="a2a" min="2" max="20" value="6" oninput="a2update()" style="width:110px">
+              <span class="slider-val" id="a2av" style="color:var(--amber)">6</span>
+            </div>
+          </div>
+          <div class="slider-group">
+            <div class="slider-label" style="color:rgba(0,212,255,.7)">Bob secret b</div>
+            <div style="display:flex;align-items:center;">
+              <input type="range" id="a2b" min="2" max="20" value="15" oninput="a2update()" style="width:110px">
+              <span class="slider-val" id="a2bv" style="color:var(--cyan)">15</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alice perspective -->
+    <div class="term" style="border-color:rgba(255,184,0,.25);">
+      <div class="term-hdr"><div class="td r"></div><div class="td y"></div><div class="td g"></div><span class="term-title" style="color:rgba(255,184,0,.7)">👤 ALICE'S PERSPECTIVE</span></div>
+      <div class="term-body"><div class="code" id="a2acode"></div></div>
+    </div>
+
+    <!-- Bob perspective -->
+    <div class="term" style="border-color:rgba(0,212,255,.25);">
+      <div class="term-hdr"><div class="td r"></div><div class="td y"></div><div class="td g"></div><span class="term-title" style="color:rgba(0,212,255,.7)">👤 BOB'S PERSPECTIVE</span></div>
+      <div class="term-body"><div class="code" id="a2bcode"></div></div>
+    </div>
+
+    <!-- Eve perspective (no crack grid here, that's Activity 3) -->
+    <div class="term" style="border-color:rgba(255,51,85,.28);">
+      <div class="term-hdr"><div class="td r"></div><div class="td y"></div><div class="td g"></div><span class="term-title" style="color:rgba(255,51,85,.7)">👁 EVE'S VIEW — WHAT THE ENEMY SEES</span></div>
+      <div class="term-body"><div class="code" id="a2ecode"></div></div>
+    </div>
+
+  </div><!-- /activity 2 -->
+
+  <hr class="story">
+
+  <!-- ══════════════════════════════════════
+       SCENE 3 — DIALOG BRUTE FORCE
+  ══════════════════════════════════════ -->
+  <div class="scene-marker reveal">
+    <div class="scene-line"></div>
+    <div class="scene-label">⟨ SCENE 03 — THE ADVERSARY ⟩</div>
+    <div class="scene-line"></div>
+  </div>
+
+  <div class="dialog reveal">
+    <div class="bubble-row">
+      <div class="avatar q" data-name="Q"><img src="images/Q.jpg" alt="Q"></div>
+      <div class="bubble from-q">
+        You've seen how the maths works. Now put yourself in the enemy's shoes.<br><br>
+        <span class="hl-red">You are Eve.</span> You've intercepted the public exchange. You know <span class="hl-amber">g</span>, <span class="hl-amber">p</span>, and Alice's public value <span class="hl-cyan">A = g^a mod p</span>. How would you find the secret <span class="hl-amber">a</span> ?
+      </div>
+    </div>
+
+    <div class="bubble-row right">
+      <div class="avatar player" data-name="AGENT"><img class="player-img" src="" alt="AGENT"></div>
+      <div class="bubble from-player">
+        I guess the simplest way is to just try them all one by one…
+      </div>
+    </div>
+
+    <div class="bubble-row">
+      <div class="avatar q" data-name="Q"><img src="images/Q.jpg" alt="Q"></div>
+      <div class="bubble from-q">
+        Exactly. Let's setup an example. If our modulo <span class="hl-amber">p = 23</span> and the public base <span class="hl-amber">g = 5</span>, there are only 21 candidates to test. Go ahead — try to crack it. Click each candidate exponent and see if it produces Alice's public value. Count how many attempts it takes.<br><br>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       ACTIVITY 3 — EVE BRUTE FORCE
+  ══════════════════════════════════════ -->
+  <div class="activity reveal" data-label="ACTIVITY 03 — EVE'S BRUTE-FORCE SEARCH">
+
+    <div class="term" style="border-color:rgba(255,51,85,.28);">
+      <div class="term-hdr"><div class="td r"></div><div class="td y"></div><div class="td g"></div><span class="term-title" style="color:rgba(255,51,85,.7)">EVE'S PERSPECTIVE — CRACK ALICE'S SECRET</span></div>
+      <div class="term-body">
+        <div class="tl" style="color:rgba(255,51,85,.9)"><span class="p">></span> You intercepted the public channel. You know everything below.</div>
+        <div class="tl" style="color:rgba(255,51,85,.9)"><span class="p">></span> Find <span class="warn">a</span> such that <span class="info">g^a mod p = A</span>.</div>
+        <div class="code" id="a3-ecode" style="margin-top:14px;"></div>
+        <hr style="border:none;border-top:1px solid var(--border);margin:16px 0;">
+        <div style="font-size:13px;color:rgba(255,51,85,.8);margin-bottom:12px;">Click a candidate exponent to test it:</div>
+        <div id="a3-cgrid" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;"></div>
+        <div id="a3-tries" style="font-size:13px;color:rgba(255,184,0,.85);min-height:22px;margin-bottom:10px;"></div>
+        <div id="a3-cresult"><div class="code" id="a3-cresult-inner"></div></div>
+      </div>
+    </div>
+
+  </div><!-- /activity 3 -->
+<div class="dialog reveal">
+  <div class="bubble-row right">
+      <div class="avatar player" data-name="AGENT"><img class="player-img" src="" alt="AGENT"></div>
+      <div class="bubble from-player">
+        But then, how do I know I chose good values for <span class="hl-amber">my parameters</span> ? 
+      </div>
+    </div>
+
+    <div class="bubble-row">
+      <div class="avatar q" data-name="Q"><img src="images/Q.jpg" alt="Q"></div>
+      <div class="bubble from-q">
+        That's a good question, for p you only need to choose a prime number that is big enough. For g it is a bit more complicated.<br>
+        A good <b>g</b> must be a <span class="hl-green">primitive root mod p</span> — meaning its order equals p-1, so <span class="hl-cyan">it cycles through all possible values before repeating</span>. This maximises the search space Eve faces.<br>
+        For p = 23, the primitive roots are: 5, 7, 10, 11, 14, 15, 17, 19, 20, 21 — exactly 10 of them.<br>
+        On the other side, non-primitive roots are dangerous. g = 2 mod 23 has order 11, meaning it only ever produces 11 distinct public values instead of 22. Eve's search space is instantly <span class="hl-red">halved</span> — a serious weakness.<br><br>
+        Finally for your personal secret key <b>a or b</b>, you just need it to be a <b>big positive random number</b>.
+      </div>
+    </div>
+</div>
+
+  <hr class="story">
+
+  <!-- ══════════════════════════════════════
+       SCENE 4 — DIALOG REAL SCALE
+  ══════════════════════════════════════ -->
+  <div class="scene-marker reveal">
+    <div class="scene-line"></div>
+    <div class="scene-label">⟨ SCENE 04 — THE REAL WORLD ⟩</div>
+    <div class="scene-line"></div>
+  </div>
+
+  <div class="dialog reveal">
+    <div class="bubble-row">
+      <div class="avatar q" data-name="Q"><img src="images/Q.jpg" alt="Q"></div>
+      <div class="bubble from-q">
+        With 21 candidates you found it in a handful of tries. Satisfying, wasn't it?<br><br>
+        Now consider this. In production systems, the prime <span class="hl-amber">p</span> is not 23. It has <span class="hl-red">2048 bits</span> — that's roughly 617 decimal digits. The number of candidates Eve would need to search is approximately <span class="hl-red">10^617</span>. Even with every GPU on Earth running in parallel, that search would take longer than the age of the universe.
+      </div>
+    </div>
+
+    <div class="bubble-row right">
+      <div class="avatar player" data-name="AGENT"><img class="player-img" src="" alt="AGENT"></div>
+      <div class="bubble from-player">
+        But computing g^a mod p on a 2048-bit prime — doesn't that take forever too?
+      </div>
+    </div>
+
+    <div class="bubble-row">
+      <div class="avatar q" data-name="Q"><img src="images/Q.jpg" alt="Q"></div>
+      <div class="bubble from-q">
+        Not at all. That's the elegant asymmetry at the heart of this protocol.<br><br>
+        The forward computation — <span class="hl-green">g^a mod p</span> — uses a technique called <b>fast modular exponentiation</b>. On modern hardware, it runs in <span class="hl-green">milliseconds</span>.<br><br>
+        The reverse — finding <span class="hl-amber">a</span> from the result — has no efficient algorithm. The best known approach, the <b>Number Field Sieve</b>, still requires around <span class="hl-red">~10^90 operations</span> at this key size. We call this modular exponentiation a <span class="hl-red">trap door function</span>. I again prepared a program just for you. Run it yourself and see the difference.
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       ACTIVITY 4 — FORWARD / REVERSE
+  ══════════════════════════════════════ -->
+  <div class="activity reveal" data-label="ACTIVITY 04 — FORWARD vs REVERSE DIRECTION">
+
+    <!-- RFC 3526 prime display -->
+    <div class="term">
+      <div class="term-hdr"><div class="td r"></div><div class="td y"></div><div class="td g"></div><span class="term-title">RFC 3526 GROUP 14 — 2048-BIT PRIME</span></div>
+      <div class="term-body">
+        <div class="bignum" id="a4-prime"></div>
+        <div style="margin-top:9px;font-size:12px;color:rgba(0,212,255,.5);">
+          Decimal digits: <span style="color:var(--amber)" id="a4-digs">617</span> &nbsp;·&nbsp;
+          Bits: <span style="color:var(--amber)">2048</span> &nbsp;·&nbsp;
+          Used in: <span style="color:var(--amber)">TLS, SSH, IPSec</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Forward direction -->
+    <div class="term" style="border-color:rgba(0,212,255,.25);">
+      <div class="term-hdr"><div class="td r"></div><div class="td y"></div><div class="td g"></div><span class="term-title">FORWARD DIRECTION — FAST ✓</span></div>
+      <div class="term-body">
+        <div style="font-size:14px;color:rgba(0,212,255,.78);margin-bottom:14px;">Computing g^a mod p takes milliseconds even at 2048-bit scale.</div>
+        <button class="btn green" id="a4-fwdBtn" onclick="a4forward()">▶ COMPUTE g^a mod p NOW</button>
+        <div class="time-result" id="a4-fwdRes"></div>
+      </div>
+    </div>
+
+    <!-- Reverse direction -->
+    <div class="term" style="border-color:rgba(255,51,85,.28);">
+      <div class="term-hdr"><div class="td r"></div><div class="td y"></div><div class="td g"></div><span class="term-title">REVERSE DIRECTION — IMPOSSIBLE ✗</span></div>
+      <div class="term-body">
+        <div style="font-size:14px;color:rgba(255,51,85,.85);margin-bottom:6px;">Finding <em>a</em> from A = g^a mod p on a 2048-bit prime — best known algorithm: Number Field Sieve.</div>
+        <div style="font-size:12px;color:rgba(0,212,255,.45);margin-bottom:16px;">Sub-exponential complexity — fastest algorithm known, yet still hopelessly slow at 2048-bit scale.</div>
+        <button class="btn red" id="a4-revBtn" onclick="a4reverse()">▶ COMPUTE ESTIMATED TIME</button>
+        <div class="time-result" id="a4-revRes"></div>
+      </div>
+    </div>
+
+  </div><!-- /activity 4 -->
+
+  <hr class="story">
+
+  <!-- ══════════════════════════════════════
+       SCENE 5 — DEBRIEF WITH Q
+  ══════════════════════════════════════ -->
+  <div class="scene-marker reveal">
+    <div class="scene-line"></div>
+    <div class="scene-label">⟨ SCENE 05 — DEBRIEF ⟩</div>
+    <div class="scene-line"></div>
+  </div>
+
+  <div class="dialog reveal">
+    <div class="bubble-row right">
+      <div class="avatar player" data-name="AGENT"><img class="player-img" src="" alt="AGENT"></div>
+      <div class="bubble from-player">
+        So the forward computation runs in milliseconds, and the reverse would outlast the universe. That asymmetry is the quite a trick.
+      </div>
+    </div>
+
+    <div class="bubble-row">
+      <div class="avatar q" data-name="Q"><img src="images/Q.jpg" alt="Q"></div>
+      <div class="bubble from-q">
+        Exactly, two parties, an open channel, an adversary recording every packet and yet - a shared secret well kept.<br><br>
+        You now understand the foundation. Go to the field, and good luck.
+      </div>
+    </div>
+
+    <div class="bubble-row right">
+      <div class="avatar player" data-name="AGENT"><img class="player-img" src="" alt="AGENT"></div>
+      <div class="bubble from-player">
+        Understood. Thank you Q, see you later.
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- ══════════════════════════════════════
+       CINEMATIC TRANSITION — FEW DAYS LATER
+  ══════════════════════════════════════ -->
+  <div class="time-jump reveal">
+    <div class="tj-line"></div>
+    <div class="tj-content">
+      <div class="tj-title">few days later …</div>
+      <div class="tj-sub">in the headquarters of a terrorism organisation</div>
+    </div>
+    <div class="tj-line"></div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════
+       SCENE 6 — PLAYER vs EVE
+  ══════════════════════════════════════ -->
+  <div class="scene-marker reveal">
+    <div class="scene-line"></div>
+    <div class="scene-label">⟨ SCENE 06 — THE ADVERSARY ⟩</div>
+    <div class="scene-line"></div>
+  </div>
+
+  <div class="dialog reveal">
+    <div class="bubble-row">
+      <div class="avatar eve" data-name="EVE"><img src="images/eve.jpg" alt="E"></div>
+      <div class="bubble from-eve">
+        Hello agent <span class="player-name-text">AGENT</span>. We finally meet in person.<br><br>
+        I've been watching your transmissions for days. Every packet, every handshake. I know you've been using Diffie-Hellman to communicate with your contact — and you really think it is  <span style="color:var(--red);">infallible</span> ?
+      </div>
+    </div>
+
+    <div class="bubble-row right">
+      <div class="avatar player" data-name="AGENT"><img class="player-img" src="" alt="AGENT"></div>
+      <div class="bubble from-player">
+        Are you telling me you were able to crack it ?
+      </div>
+    </div>
+
+    <div class="bubble-row">
+      <div class="avatar eve" data-name="EVE"><img src="images/eve.jpg" alt="E"></div>
+      <div class="bubble from-eve">
+        The key ? No. The maths held. I'll give you that.<br><br>
+        But here's what your precious protocol doesn't do — it doesn't tell you <b>who you're talking to</b>. You agreed on a shared secret, you assumed it was with your contact. Did it never crossed your mind to verify their <span style="color:var(--red);">identity</span> ?
+      </div>
+    </div>
+
+    <div class="bubble-row right">
+      <div class="avatar player" data-name="AGENT"><img class="player-img" src="" alt="AGENT"></div>
+      <div class="bubble from-player">
+        What are you trying to say <span class="hl-red">Eve</span> ?
+      </div>
+    </div>
+
+    <div class="bubble-row">
+      <div class="avatar eve" data-name="EVE"><img src="images/eve.jpg" alt="E"></div>
+      <div class="bubble from-eve">
+        <span class="hl-red"><i>*evil laugh*</i></span> <br>
+        I love the confusion on your face ... I just positioned myself between you and your contact three days ago. You exchanged keys with <b>me</b>. Your contact exchanged keys with <b>me</b>. Neither of you ever spoke to each other directly.<br><br>
+        Every message you thought was encrypted end-to-end — I read it. Both sides. In real time. That's what we call a <span style="color:var(--red);">man-in-the-middle attack.</span> And Diffie-Hellman, on its own, has no defence against it.
+      </div>
+    </div>
+
+    <div class="bubble-row right">
+      <div class="avatar player" data-name="AGENT"><img class="player-img" src="" alt="AGENT"></div>
+      <div class="bubble from-player">
+        …
+      </div>
+    </div>
+
+    <div class="bubble-row">
+      <div class="avatar eve" data-name="EVE"><img src="images/eve.jpg" alt="E"></div>
+      <div class="bubble from-eve">
+        Don't feel too bad, you tried your best. But I expect a better entertainment next time... 
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════
+       CINEMATIC TRANSITION — NEXT DAY
+  ══════════════════════════════════════ -->
+  <div class="time-jump reveal" style="--tj-accent: rgba(255,184,0,0.18); --tj-border: rgba(255,184,0,0.15);">
+    <div class="tj-line" style="background:rgba(255,184,0,0.15);"></div>
+    <div class="tj-content">
+      <div class="tj-title" style="color:var(--amber);text-shadow:0 0 30px var(--amb-glow);">next day …</div>
+      <div class="tj-sub">In a secret location</div>
+    </div>
+    <div class="tj-line" style="background:rgba(255,184,0,0.15);"></div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════
+       SCENE 7 — PLAYER + Q FINAL
+  ══════════════════════════════════════ -->
+  <div class="scene-marker reveal">
+    <div class="scene-line"></div>
+    <div class="scene-label">⟨ SCENE 07 — RECKONING ⟩</div>
+    <div class="scene-line"></div>
+  </div>
+
+  <div class="dialog reveal">
+    <div class="bubble-row right">
+      <div class="avatar player" data-name="AGENT"><img class="player-img" src="" alt="AGENT"></div>
+      <div class="bubble from-player">
+        Q ! What just happened ?! You didn't tell me about this breach !! I made myself look like an idiot... The key exchange worked perfectly — and it didn't matter. She sat in the middle the whole time. We never thought about <b>authentication</b>.
+      </div>
+    </div>
+
+    <div class="bubble-row">
+      <div class="avatar q" data-name="Q"><img src="images/Q.jpg" alt="Q"></div>
+      <div class="bubble from-q">
+        I know. I am as embarrassed as you.<br><br>
+        Diffie-Hellman gives you <span class="hl-green">confidentiality</span>, certainly, but it does not give you <span class="hl-red">authentication</span>. Without knowing <em>who</em> you're negotiating with, the key exchange is vulnerable to exactly what Eve did — intercepting both handshakes and impersonating both sides simultaneously.
+      </div>
+    </div>
+
+    <div class="bubble-row right">
+      <div class="avatar player" data-name="AGENT"><img class="player-img" src="" alt="AGENT"></div>
+      <div class="bubble from-player">
+        So what's the fix? 
+      </div>
+    </div>
+
+    <div class="bubble-row">
+      <div class="avatar q" data-name="Q"><img src="images/Q.jpg" alt="Q"></div>
+      <div class="bubble from-q">
+        Digital signatures. Certificates. A trusted third party that vouches for identity before a single byte is exchanged. I am sure we can find a solution, but they are things we'll cover next time. Go home agent, it is not the time yet. But you've learned a very important lesson today, that's the least we can say.
+      </div>
+    </div>
+
+    <div class="bubble-row right">
+      <div class="avatar player" data-name="AGENT"><img class="player-img" src="" alt="AGENT"></div>
+      <div class="bubble from-player">
+        Today we discovered that <b><span class="hl-amber">secrecy without identity is a door with a perfect lock and no way to check who's knocking</span></b>.
+      </div>
+    </div>
+
+    <div class="bubble-row">
+      <div class="avatar q" data-name="Q"><img src="images/Q.jpg" alt="Q"></div>
+      <div class="bubble from-q">
+        Elegantly put. I'll use that.<br><br>
+        Rest up. We'll cover the weaknesses properly in the next briefing.
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════
+       THE END
+  ══════════════════════════════════════ -->
+  <div class="the-end reveal">
+    <div class="the-end-inner">
+      <div class="the-end-rule"></div>
+      <div class="the-end-text">The End</div>
+      <div class="the-end-rule"></div>
+    </div>
+  </div>
+
+</div><!-- /scroll-wrap -->
+
+<!-- ═══════════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════════ -->
+<script>
+/* ── Agent from sessionStorage ── */
+(function(){
+  const id   = sessionStorage.getItem('cryptex_agent') || 'alice';
+  const name = sessionStorage.getItem('cryptex_agent_name') || 'AGENT';
+  const isAlice = id === 'alice';
+  const color = isAlice ? '#ffb800' : '#00d4ff';
+  const glow  = isAlice ? 'rgba(255,184,0,.5)' : 'rgba(0,212,255,.5)';
+
+  document.getElementById('tb-agent').textContent = 'OPERATIVE: ' + name;
+
+  // 3. Update Name Placeholders in the story text
+  // This looks for every <span class="player-name-text"> and changes it to Alice or Bob
+  document.querySelectorAll('.player-name-text').forEach(el => {
+    el.textContent = name;
+  });
+
+  // Style all player avatars
+  const playerSrc = isAlice
+    ? 'images/Alice.png' : "images/bob.png";
+  document.querySelectorAll('.avatar.player').forEach(el => {
+    el.dataset.name = name;
+    el.style.borderColor = color;
+    el.style.boxShadow = `0 0 14px ${glow}`;
+    const img = el.querySelector('img');
+    if(img) img.src = playerSrc;
+  });
+  // Player bubbles
+  document.querySelectorAll('.bubble.from-player').forEach(el => {
+    el.style.background = isAlice ? 'rgba(255,184,0,.07)' : 'rgba(0,212,255,.07)';
+    el.style.borderColor = isAlice ? 'rgba(255,184,0,.22)' : 'rgba(0,212,255,.22)';
+    el.style.color = isAlice ? 'rgba(255,184,0,.9)' : 'rgba(0,212,255,.9)';
+  });
+  document.querySelectorAll('.bubble.from-player::after').forEach(el => {
+    el.style.borderLeftColor = isAlice ? 'rgba(255,184,0,.22)' : 'rgba(0,212,255,.22)';
+  });
+})();
+
+/* ── Scroll reveal ── */
+const revealObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if(e.isIntersecting) { e.target.classList.add('visible'); revealObserver.unobserve(e.target); } });
+}, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+/* ── Utility ── */
+function modPow(base, exp, mod) {
+  let r=1n, b=BigInt(base)%BigInt(mod), e=BigInt(exp), m=BigInt(mod);
+  while(e>0n){if(e%2n===1n)r=(r*b)%m; e>>=1n; b=(b*b)%m;}
+  return Number(r);
+}
+function modPowBig(base,exp,mod){let r=1n,b=base%mod,e=exp;while(e>0n){if(e%2n===1n)r=(r*b)%mod;e>>=1n;b=(b*b)%mod;}return r;}
+function randBigInt(bits){let hex='';for(let i=0;i<bits/4;i++)hex+='0123456789abcdef'[Math.floor(Math.random()*16)];return BigInt('0x'+hex)|1n;}
+function delay(ms){return new Promise(r=>setTimeout(r,ms));}
+function showEl(id){const e=document.getElementById(id);if(e)e.classList.add('show');}
+const rgb = c => `rgb(${c[0]},${c[1]},${c[2]})`;
+const blend = (a,b,r=.5) => [0,1,2].map(i=>Math.round(a[i]*(1-r)+b[i]*r));
+const tri   = (a,b,c)    => [0,1,2].map(i=>Math.round((a[i]+b[i]+c[i])/3));
+
+/* ════════════════════════════
+   ACTIVITY 1 — COLOUR ANALOGY
+════════════════════════════ */
+const ALL_SECRETS=[[220,50,70],[50,90,220],[50,180,80],[180,50,200],[230,110,20],[20,180,200]];
+const PUB_BASE=[255,215,60];
+let A1 = { aliceSec:[220,50,70], bobSec:[50,90,220] };
+
+document.querySelectorAll('#a1-swatches .sw').forEach(sw => {
+  sw.onclick = () => {
+    document.querySelectorAll('#a1-swatches .sw').forEach(s=>s.classList.remove('sel'));
+    sw.classList.add('sel');
+    A1.aliceSec = sw.dataset.c.split(',').map(Number);
+    A1.bobSec = ALL_SECRETS.find(c=>c.join()!==A1.aliceSec.join()) || ALL_SECRETS[1];
+    // Reset animation
+    document.getElementById('a1-animbox').style.display='none';
+    document.getElementById('a1-matchmsg').style.display='none';
+    document.querySelectorAll('.mix-step').forEach(e=>e.classList.remove('show'));
+  };
+});
+
+async function a1Start(){
+  const aS=A1.aliceSec, bS=A1.bobSec, pub=PUB_BASE;
+  const aPub=blend(pub,aS,.5), bPub=blend(pub,bS,.5), shared=tri(pub,aS,bS);
+  const ids={s1aSecC:aS,s1aMixC:aPub,s1bSecC:bS,s1bMixC:bPub,s1fbmC:bPub,s1fasecC:aS,s1fashC:shared,s1famC:aPub,s1fbsecC:bS,s1fbshC:shared};
+  Object.entries(ids).forEach(([id,c])=>{const el=document.getElementById(id);if(el)el.style.backgroundColor=rgb(c);});
+  document.getElementById('a1-animbox').style.display='block';
+  document.getElementById('a1-matchmsg').style.display='none';
+  document.querySelectorAll('.mix-step').forEach(e=>e.classList.remove('show'));
+  await delay(120);showEl('s1base');
+  await delay(440);showEl('s1aSec');await delay(140);showEl('s1ar1');await delay(140);showEl('s1aPub0');await delay(140);showEl('s1ar2');await delay(300);showEl('s1aMix');
+  await delay(500);showEl('s1bSec');await delay(140);showEl('s1br1');await delay(140);showEl('s1bPub0');await delay(140);showEl('s1br2');await delay(300);showEl('s1bMix');
+  await delay(580);showEl('s1fbm');await delay(110);showEl('s1fa1');await delay(110);showEl('s1fasec');await delay(110);showEl('s1fa2');await delay(300);showEl('s1fash');
+  await delay(200);showEl('s1fam');await delay(110);showEl('s1fb1');await delay(110);showEl('s1fbsec');await delay(110);showEl('s1fb2');await delay(300);showEl('s1fbsh');
+  await delay(460);
+  document.getElementById('s1fashC').classList.add('glow');
+  document.getElementById('s1fbshC').classList.add('glow');
+  document.getElementById('a1-matchmsg').style.display='block';
+}
+
+/* ════════════════════════════
+   ACTIVITY 2 — SLIDERS
+════════════════════════════ */
+let A2 = { tries:0 };
+
+function a2update(){
+  const g=+document.getElementById('a2g').value,
+        p=+document.getElementById('a2p').value,
+        a=+document.getElementById('a2a').value,
+        b=+document.getElementById('a2b').value;
+  document.getElementById('a2gv').textContent=g;
+  document.getElementById('a2av').textContent=a;
+  document.getElementById('a2bv').textContent=b;
+
+  const A=modPow(g,a,p), B=modPow(g,b,p), sA=modPow(B,a,p), sB=modPow(A,b,p), ok=sA===sB;
+
+  document.getElementById('a2acode').innerHTML=
+    `<span class="cc">// Alice — knows g, p (public) and her OWN secret a</span>\n`+
+    `g = <span class="cv">${g}</span>,  p = <span class="cv">${p}</span>    <span class="cc">-- public parameters</span>\n`+
+    `a = <span class="cv">${a}</span>           <span class="cc">-- Alice's private secret (never transmitted)</span>\n\n`+
+    `A = g^a mod p  =  ${g}^${a} mod ${p}  =  <span class="cr">${A}</span>   <span class="cc">-- Alice sends publicly</span>\n\n`+
+    `<span class="cc">// Alice receives B=${B} from Bob, computes shared key:</span>\n`+
+    `K = B^a mod p  =  ${B}^${a} mod ${p}  =  <span class="${ok?'cok':'cbad'}">${sA}</span>   ${ok?'<span class="cc">-- shared key ✓</span>':'<span class="cbad">-- check parameters</span>'}`;
+
+  document.getElementById('a2bcode').innerHTML=
+    `<span class="cc">// Bob — knows g, p (public) and his OWN secret b</span>\n`+
+    `g = <span class="cv">${g}</span>,  p = <span class="cv">${p}</span>    <span class="cc">-- public parameters</span>\n`+
+    `b = <span class="cv">${b}</span>           <span class="cc">-- Bob's private secret (never transmitted)</span>\n\n`+
+    `B = g^b mod p  =  ${g}^${b} mod ${p}  =  <span class="cr">${B}</span>   <span class="cc">-- Bob sends publicly</span>\n\n`+
+    `<span class="cc">// Bob receives A=${A} from Alice, computes shared key:</span>\n`+
+    `K = A^b mod p  =  ${A}^${b} mod ${p}  =  <span class="${ok?'cok':'cbad'}">${sB}</span>   ${ok?'<span class="cc">-- shared key ✓</span>':'<span class="cbad">-- check parameters</span>'}`;
+
+  document.getElementById('a2ecode').innerHTML=
+    `<span class="cc">// Eve — intercepts everything sent publicly</span>\n`+
+    `g = <span class="cv">${g}</span>,  p = <span class="cv">${p}</span>    <span class="cc">-- already public</span>\n`+
+    `A = <span class="cr">${A}</span>            <span class="cc">-- intercepted from Alice</span>\n`+
+    `B = <span class="cr">${B}</span>            <span class="cc">-- intercepted from Bob</span>\n\n`+
+    `<span class="cc">// Does NOT know: a or b</span>\n`+
+    `<span class="cc">// Must solve: find x such that  ${g}^x mod ${p} = ${A}</span>\n`+
+    `<span class="cbad">a = ???   -- must brute-force (see Activity 03)</span>`;
+}
+a2update();
+
+/* ════════════════════════════
+   ACTIVITY 3 — BRUTE FORCE
+════════════════════════════ */
+let A3 = { tries:0, g:5, p:23, a:6 };
+
+(function initA3(){
+  const g=A3.g, p=A3.p, a=A3.a;
+  const A = modPow(g,a,p);
+  A3.target = A;
+
+  document.getElementById('a3-ecode').innerHTML=
+    `<span class="cc">// Eve's intercepted data</span>\n`+
+    `g = <span class="cv">${g}</span>,  p = <span class="cv">${p}</span>    <span class="cc">-- public parameters</span>\n`+
+    `A = <span class="cr">${A}</span>            <span class="cc">-- Alice's public value (intercepted)</span>\n\n`+
+    `<span class="cc">// Goal: find x such that  ${g}^x mod ${p} = ${A}</span>\n`+
+    `<span class="cbad">a = ???</span>`;
+
+  const grid = document.getElementById('a3-cgrid');
+  grid.innerHTML = '';
+  for(let x=2; x<p; x++){
+    const cell = document.createElement('div');
+    cell.className='crack-cell';
+    cell.innerHTML=`<div style="font-family:var(--orb);font-size:13px;color:var(--amber)">${x}</div>`;
+    cell.onclick = (xv=>()=>a3crack(xv))(x);
+    grid.appendChild(cell);
+  }
+})();
+
+function a3crack(x){
+  document.querySelectorAll('#a3-cgrid .crack-cell').forEach(c=>{
+    if(!c.classList.contains('miss')&&!c.classList.contains('hit')){
+      c.classList.remove('testing');
+    }
+  });
+  const cells = document.querySelectorAll('#a3-cgrid .crack-cell');
+  const idx = x-2;
+  if(cells[idx]) cells[idx].classList.add('testing');
+  document.getElementById('a3-cresult').style.display='none';
+
+  setTimeout(()=>{
+    A3.tries++;
+    const result = modPow(A3.g, x, A3.p);
+    const hit = result === A3.target;
+    if(cells[idx]){cells[idx].classList.remove('testing');cells[idx].classList.add(hit?'hit':'miss');}
+    if(hit) document.querySelectorAll('#a3-cgrid .crack-cell:not(.hit)').forEach(c=>c.style.pointerEvents='none');
+
+    document.getElementById('a3-tries').innerHTML=
+      `Attempts so far: <span style="color:var(--amber);font-family:var(--orb)">${A3.tries}</span>  &nbsp;|&nbsp;  `+
+      (hit?`<span style="color:var(--green)">Secret found! a = ${x}</span>`:`<span style="color:rgba(255,51,85,.78)">Wrong — try another</span>`);
+
+    const res=document.getElementById('a3-cresult');
+    res.style.display='block';
+    document.getElementById('a3-cresult-inner').innerHTML=
+      `<span class="cc">// Testing candidate x = ${x}</span>\n`+
+      `${A3.g}^<span class="cv">${x}</span> mod ${A3.p}  =  <span class="${hit?'cok':'cbad'}">${result}</span>\n\n`+
+      (hit
+        ? `<span class="cok">= ${A3.target}  ✓ FOUND!  a = ${x}  (${A3.tries} attempt${A3.tries>1?'s':''})</span>\n<span class="cc">// With a 2048-bit prime: ~10^617 candidates. Same approach, impossible scale.</span>`
+        : `<span class="cbad">≠ ${A3.target}  Wrong. (${A3.tries} attempt${A3.tries>1?'s':''} so far)</span>`);
+  }, 480);
+}
+
+/* ════════════════════════════
+   ACTIVITY 4 — FORWARD/REVERSE
+════════════════════════════ */
+const RFC3526='32317006071311007300338913926423828248817941241140239112842009751400741706634354222619689417363569347117901737909704191754605873209195028853758986185492105487463830569347746798476702575527752503096832928837699979955388667070022493248724269565241568613508068697703959635127583948017029588947497440126157919437899827793998308827401';
+document.getElementById('a4-prime').textContent = RFC3526;
+document.getElementById('a4-digs').textContent  = RFC3526.length;
+
+const P_HEX=[
+  'FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1',
+  '29024E088A67CC74020BBEA63B139B22514A08798E3404DD',
+  'EF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245',
+  'E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7ED',
+  'EE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3D',
+  'C2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F',
+  '83655D23DCA3AD961C62F356208552BB9ED529077096966D',
+  '670C354E4ABC9804F1746C08CA18217C32905E462E36CE3B',
+  'E39E772C180E86039B2783A2EC07A28FB5C55DF06F4C52C9',
+  'DE2BCBF6955817183995497CEA956AE515D2261898FA0510',
+  '15728E5A8AACAA68FFFFFFFFFFFFFFFF'
+].join('');
+const BIG_P = BigInt('0x'+P_HEX);
+
+async function a4forward(){
+  const btn = document.getElementById('a4-fwdBtn');
+  btn.disabled=true; btn.textContent='COMPUTING…';
+  await delay(20);
+  const a = randBigInt(2048);
+  const t0 = performance.now();
+  const A  = modPowBig(2n, a, BIG_P);
+  const t1 = performance.now();
+  const aHex = a.toString(16).replace(/(.{8})/g,'$1 ').trim();
+  const AHex = A.toString(16).replace(/(.{8})/g,'$1 ').trim();
+  const el = document.getElementById('a4-fwdRes');
+  el.className='time-result show';
+  el.innerHTML=
+    `<div class="code" style="margin-bottom:14px;">`+
+    `<span class="cc">// RFC 3526 Group 14 — 2048-bit prime</span>\n`+
+    `g = <span class="cv">2</span>  (standard generator)\n`+
+    `a = <span class="cv" style="font-size:11px;word-break:break-all">0x ${aHex}</span>\n    <span class="cc">(random 2048-bit private exponent — never transmitted)</span>\n\n`+
+    `A = g^a mod p\n  = <span class="cok" style="font-size:11px;word-break:break-all">0x ${AHex}</span>\n    <span class="cc">(${A.toString(16).length*4} bits — this is what Alice sends publicly)</span>`+
+    `</div>`+
+    `<div style="padding:20px;background:rgba(0,255,80,.06);border:1px solid rgba(0,255,80,.3);border-radius:6px;text-align:center;">`+
+    `<div style="font-size:10px;color:rgba(0,255,80,.45);text-transform:uppercase;letter-spacing:.18em;margin-bottom:8px;">Computed in</div>`+
+    `<div style="font-family:var(--orb);font-size:clamp(2rem,6vw,3.5rem);color:#00ff50;text-shadow:0 0 28px rgba(0,255,80,.7);letter-spacing:.05em;">${(t1-t0).toFixed(3)}<span style="font-size:1rem;margin-left:6px;opacity:.65">ms</span></div>`+
+    `<div style="font-size:11px;color:rgba(0,255,80,.4);margin-top:8px;">on a real 2048-bit prime &nbsp;·&nbsp; O(log a) ≈ 2048 big-integer multiplications</div>`+
+    `</div>`;
+  btn.textContent='RECOMPUTE (new random a)'; btn.disabled=false;
+}
+
+function a4reverse(){
+  const btn = document.getElementById('a4-revBtn');
+  btn.disabled=true; btn.textContent='COMPUTING…';
+  setTimeout(()=>{
+    const el = document.getElementById('a4-revRes');
+    el.className='time-result show';
+    el.innerHTML=
+      `<div class="code" style="margin-bottom:14px;">`+
+      `Algorithm:   <span style="color:var(--pink)">Number Field Sieve (NFS)</span>\n`+
+      `Key size:    <span class="cv">2048 bits</span>\n`+
+      `Operations:  <span class="cv">~10^90</span>`+
+      `</div>`+
+      `<div style="padding:20px;background:rgba(255,51,85,.07);border:1px solid rgba(255,51,85,.3);border-radius:6px;text-align:center;">`+
+      `<div style="font-size:10px;color:rgba(255,51,85,.5);text-transform:uppercase;letter-spacing:.18em;margin-bottom:8px;">Estimated time to crack</div>`+
+      `<div style="font-family:var(--orb);font-size:clamp(2rem,6vw,3.5rem);color:var(--red);text-shadow:0 0 28px rgba(255,51,85,.6);letter-spacing:.05em;">~10^36 years</div>`+
+      `</div>`;
+    btn.textContent='RECOMPUTE'; btn.disabled=false;
+  }, 320);
+}
+</script>
+</body>
+</html>
