@@ -571,7 +571,7 @@ hr.story{border:none;border-top:1px solid rgba(0,212,255,.1);margin:48px 0;}
       <div class="avatar q" data-name="Q"><img src="images/Q.jpg" alt="Q"></div>
       <div class="bubble from-q">
         <span class="hl-cyan"><i>*chuckles*</i></span> <br>
-        You begin to know me agent <span class="player-name-text">AGENT</span> ! Indeed, I prepared you a playground. Adjust <b>g</b>, <b>p</b>, and the two secret exponents. Watch Alice's, Bob's, and Eve's perspectives update in real time. Note how both sides always converge on the same K.
+        You're starting to know me agent <span class="player-name-text">AGENT</span> ! Indeed, I prepared you a playground. Adjust <b>g</b>, <b>p</b>, and the two secret exponents. Watch Alice's, Bob's, and Eve's perspectives update in real time. Note how both sides always converge on the same K.
       </div>
     </div>
   </div>
@@ -1106,21 +1106,38 @@ function a2update(){
 
   const A=modPow(g,a,p), B=modPow(g,b,p), sA=modPow(B,a,p), sB=modPow(A,b,p), ok=sA===sB;
 
+  // Padding helper so columns line up
+  const pw = (v) => String(v).padEnd(4);
+
   document.getElementById('a2acode').innerHTML=
-    `<span class="cc">// Alice — knows g, p (public) and her OWN secret a</span>\n`+
+    `<span class="cc">// Alice — knows g, p (public) and her secret a</span>\n`+
     `g = <span class="cv">${g}</span>,  p = <span class="cv">${p}</span>    <span class="cc">-- public parameters</span>\n`+
     `a = <span class="cv">${a}</span>           <span class="cc">-- Alice's private secret (never transmitted)</span>\n\n`+
-    `A = g^a mod p  =  ${g}^${a} mod ${p}  =  <span class="cr">${A}</span>   <span class="cc">-- Alice sends publicly</span>\n\n`+
-    `<span class="cc">// Alice receives B=${B} from Bob, computes shared key:</span>\n`+
-    `K = B^a mod p  =  ${B}^${a} mod ${p}  =  <span class="${ok?'cok':'cbad'}">${sA}</span>   ${ok?'<span class="cc">-- shared key ✓</span>':'<span class="cbad">-- check parameters</span>'}`;
+    `<span class="cc">// Step 1 — Alice computes and sends her public value:</span>\n`+
+    `A = g^a mod p\n`+
+    `  = ${g}^${a} mod ${p}\n`+
+    `  = <span class="cr">${A}</span>   <span class="cc">-- Alice broadcasts this</span>\n\n`+
+    `<span class="cc">// Step 2 — Alice receives B=${B} from Bob, computes shared key:</span>\n`+
+    `K = B^a mod p\n`+
+    `  = (g^b)^a mod p   <span class="cc">-- substitute B = g^b mod p</span>\n`+
+    `  = g^(b·a) mod p   <span class="cc">-- exponent rule: (x^b)^a = x^(ab)</span>\n`+
+    `  = ${B}^${a} mod ${p}\n`+
+    `  = <span class="${ok?'cok':'cbad'}">${sA}</span>   ${ok?'<span class="cc">-- shared key K ✓</span>':'<span class="cbad">-- check parameters</span>'}`;
 
   document.getElementById('a2bcode').innerHTML=
-    `<span class="cc">// Bob — knows g, p (public) and his OWN secret b</span>\n`+
+    `<span class="cc">// Bob — knows g, p (public) and his secret b</span>\n`+
     `g = <span class="cv">${g}</span>,  p = <span class="cv">${p}</span>    <span class="cc">-- public parameters</span>\n`+
     `b = <span class="cv">${b}</span>           <span class="cc">-- Bob's private secret (never transmitted)</span>\n\n`+
-    `B = g^b mod p  =  ${g}^${b} mod ${p}  =  <span class="cr">${B}</span>   <span class="cc">-- Bob sends publicly</span>\n\n`+
-    `<span class="cc">// Bob receives A=${A} from Alice, computes shared key:</span>\n`+
-    `K = A^b mod p  =  ${A}^${b} mod ${p}  =  <span class="${ok?'cok':'cbad'}">${sB}</span>   ${ok?'<span class="cc">-- shared key ✓</span>':'<span class="cbad">-- check parameters</span>'}`;
+    `<span class="cc">// Step 1 — Bob computes and sends his public value:</span>\n`+
+    `B = g^b mod p\n`+
+    `  = ${g}^${b} mod ${p}\n`+
+    `  = <span class="cr">${B}</span>   <span class="cc">-- Bob broadcasts this</span>\n\n`+
+    `<span class="cc">// Step 2 — Bob receives A=${A} from Alice, computes shared key:</span>\n`+
+    `K = A^b mod p\n`+
+    `  = (g^a)^b mod p   <span class="cc">-- substitute A = g^a mod p</span>\n`+
+    `  = g^(a·b) mod p   <span class="cc">-- exponent rule: (x^a)^b = x^(ab)</span>\n`+
+    `  = ${A}^${b} mod ${p}\n`+
+    `  = <span class="${ok?'cok':'cbad'}">${sB}</span>   ${ok?'<span class="cc">-- shared key K ✓  (same as Alice)</span>':'<span class="cbad">-- check parameters</span>'}`;
 
   document.getElementById('a2ecode').innerHTML=
     `<span class="cc">// Eve — intercepts everything sent publicly</span>\n`+
